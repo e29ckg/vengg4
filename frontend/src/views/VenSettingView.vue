@@ -1,0 +1,704 @@
+<template>
+  <div class="bg-light min-vh-100">
+    <div class="container py-5">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-dark"><i class="bi bi-card-checklist me-2"></i>ชื่อเวร / กลุ่มหน้าที่ / ผู้มีสิทธ์อยู่เวร</h3>
+        <button class="btn btn-success fw-bold px-4 shadow-sm rounded-pill" @click="addMainVen">
+          <i class="bi bi-plus-circle me-2"></i>เพิ่มชื่อเวร
+        </button>
+      </div>
+
+      <div class="card shadow-sm border-0 rounded-4 mb-4">
+        <div class="card-body p-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-clock me-2"></i>ช่วงเวลาเวร</h5>
+            <button class="btn btn-outline-primary btn-sm fw-bold" @click="openTimeModal()">
+              <i class="bi bi-plus-circle me-1"></i>เพิ่มช่วงเวลา
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead><tr><th>ลำดับ</th><th>ชื่อช่วงเวลา</th><th>เวลา</th><th>การใช้งาน</th><th class="text-end">จัดการ</th></tr></thead>
+              <tbody>
+                <tr v-for="time in timeOptions" :key="time.id">
+                  <td>{{ time.srt }}</td>
+                  <td>{{ time.name_th }}</td>
+                  <td>{{ time.time_period }}</td>
+                  <td>{{ Number(time.used_count) > 0 ? `ใช้ในชื่อเวร ${time.used_count} รายการ` : 'ยังไม่ถูกใช้' }}</td>
+                  <td class="text-end text-nowrap">
+                    <button class="btn btn-outline-primary btn-sm me-2" @click="openTimeModal(time)">แก้ไข</button>
+                    <button class="btn btn-outline-danger btn-sm" :disabled="Number(time.used_count) > 0" :title="Number(time.used_count) > 0 ? 'ช่วงเวลานี้ถูกใช้ในชื่อเวรแล้ว' : 'ลบช่วงเวลา'" @click="deleteTime(time)">ลบ</button>
+                  </td>
+                </tr>
+                <tr v-if="timeOptions.length === 0"><td colspan="5" class="text-center text-muted py-3">ยังไม่มีช่วงเวลาเวร</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="row row-cols-1 row-cols-lg-2 g-4">
+        <div class="col" v-for="(ven, index) in venData" :key="ven.id">
+          <div class="card h-100 shadow-sm border-0 rounded-4">
+            
+            <div class="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-start">
+              <h6 class="fw-bold mb-0 text-dark lh-base" style="width: 75%;">
+                {{ ven.srt }} {{ ven.name }}
+              </h6>
+              <div>
+                <button class="btn btn-warning btn-sm fw-bold text-dark rounded-3 px-3 me-1" @click="editMainVen(ven)">
+                  แก้ไข
+                </button>
+                <button class="btn btn-outline-danger btn-sm rounded-3 px-2" @click="deleteVenName(ven.id)" title="ลบเวรนี้">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="card-body px-4 pb-4 pt-2">
+              <ul class="list-group list-group-flush mb-4 border rounded-3 overflow-hidden">
+                <li class="list-group-item d-flex justify-content-between align-items-center border-bottom-0 sub-item"
+                    v-for="(sub, sIndex) in ven.subs" :key="sub.id"
+                    :style="{ backgroundColor: sub.color, color: getTextColor(sub.color) }"
+                    draggable="true" 
+                    @dragstart="onDragStartSub(sIndex, ven.id)"
+                    @dragover.prevent
+                    @drop="onDropSub(sIndex, ven.id)">
+                  
+                  <span class="fw-semibold fs-6 d-flex align-items-center">
+                    <i class="bi bi-grip-vertical me-2 drag-handle fs-5" title="ลากเพื่อสลับตำแหน่ง"></i>
+                    {{ sub.srt }} <span class="ms-2">{{ sub.name }}</span> 
+                    <span class="ms-2 badge bg-white text-dark rounded-pill shadow-sm">
+                      <i class="bi bi-cash-coin text-warning me-1"></i>{{ Number(sub.price).toLocaleString() }}
+                    </span>
+                  </span>
+                  
+                  <div>
+                    <button class="btn btn-sm border-0 opacity-75 hover-opacity-100" 
+                            :style="{ color: getTextColor(sub.color) }" 
+                            @click="openManageUsersModal(sub)" 
+                            title="กำหนดผู้มีสิทธิ์ลงเวรนี้">
+                      <i class="bi bi-people-fill fs-5"></i>
+                    </button>
+                    <button class="btn btn-sm border-0 opacity-75 hover-opacity-100" :style="{ color: getTextColor(sub.color) }" @click="openSubModal('edit', ven.id, sub)">
+                      <i class="bi bi-pencil-square fs-5"></i>
+                    </button>
+                    <button class="btn btn-sm border-0 opacity-75 hover-opacity-100" :style="{ color: getTextColor(sub.color) }" @click="deleteSubDuty(sub.id)">
+                      <i class="bi bi-trash fs-5"></i>
+                    </button>
+                  </div>
+                </li>
+                <li class="list-group-item text-center text-muted py-3" v-if="ven.subs.length === 0">
+                  <small>ยังไม่มีข้อมูลหน้าที่ย่อย</small>
+                </li>
+              </ul>
+
+              <div class="text-center">
+                <button class="btn btn-outline-success btn-sm fw-bold rounded-pill px-4" @click="openSubModal('add', ven.id)">
+                  <i class="bi bi-plus-lg me-1"></i>เพิ่มหน้าที่
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="venTimeModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+          <div class="modal-header bg-primary text-white border-0 rounded-top-4">
+            <h5 class="modal-title fw-bold">{{ isEditingTime ? 'แก้ไขช่วงเวลาเวร' : 'เพิ่มช่วงเวลาเวร' }}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="ปิด"></button>
+          </div>
+          <form @submit.prevent="saveTime">
+            <div class="modal-body p-4">
+              <div class="mb-3">
+                <label for="venTimeName" class="form-label fw-semibold">ชื่อช่วงเวลา</label>
+                <input id="venTimeName" v-model.trim="timeForm.name_th" class="form-control" type="text" maxlength="50" required :disabled="selectedTimeUsedCount > 0" placeholder="เช่น กลางวัน">
+              </div>
+              <div class="mb-3">
+                <label for="venTimePeriod" class="form-label fw-semibold">ช่วงเวลา</label>
+                <input id="venTimePeriod" v-model.trim="timeForm.time_period" class="form-control" type="text" required :disabled="selectedTimeUsedCount > 0" placeholder="08.30-16.30">
+                <div class="form-text">ใช้รูปแบบ ชั่วโมง.นาที-ชั่วโมง.นาที เช่น 16.30-08.30</div>
+              </div>
+              <div class="mb-3">
+                <label for="venTimeSort" class="form-label fw-semibold">ลำดับการแสดงผล</label>
+                <input id="venTimeSort" v-model.number="timeForm.srt" class="form-control" type="number" min="1" max="9999" required>
+              </div>
+              <p v-if="selectedTimeUsedCount > 0" class="small text-muted mb-0">ช่วงเวลานี้ถูกใช้ในชื่อเวรแล้ว จึงเปลี่ยนได้เฉพาะลำดับ</p>
+            </div>
+            <div class="modal-footer border-0">
+              <button type="button" class="btn btn-light" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" class="btn btn-primary" :disabled="isSavingTime">{{ isSavingTime ? 'กำลังบันทึก...' : 'บันทึก' }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="subVenModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+          <div class="modal-header bg-success text-white border-0 rounded-top-4">
+            <h5 class="modal-title fw-bold"><i class="bi bi-tags me-2"></i>{{ isEditingSub ? 'แก้ไขหน้าที่ย่อย' : 'เพิ่มหน้าที่ย่อย' }}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <form @submit.prevent="submitSubVen">
+            <div class="modal-body p-4">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">ชื่อหน้าที่ *</label>
+                <input type="text" class="form-control" v-model="subForm.name" required placeholder="เช่น ผู้พิพากษา, งานรับฟ้อง">
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold">ค่าตอบแทน (บาท) *</label>
+                <input type="number" class="form-control" v-model="subForm.price" required min="0">
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold">สีป้ายแสดงผล *</label>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <div v-for="c in presetColors" :key="c" 
+                       @click="selectColor(c)"
+                       class="rounded-circle shadow-sm"
+                       :style="{ 
+                         backgroundColor: c, 
+                         width: '35px', height: '35px', 
+                         cursor: 'pointer',
+                         border: subForm.color.toLowerCase() === c.toLowerCase() ? '3px solid #333' : '2px solid #fff'
+                       }"
+                       :title="c">
+                  </div>
+                  <div class="rounded-circle shadow-sm overflow-hidden" 
+                       style="width: 35px; height: 35px; border: 2px solid #fff;" 
+                       title="เลือกสีอื่นๆ">
+                    <input type="color" v-model="subForm.color" class="p-0 border-0 w-100 h-100" style="cursor: pointer;">
+                  </div>
+                </div>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text" :style="{ backgroundColor: subForm.color, width: '40px' }"></span>
+                  <input type="text" class="form-control" v-model="subForm.color" required placeholder="คลิกเลือกสีด้านบน หรือพิมพ์โค้ดสี HEX">
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer border-0 pb-4 pe-4">
+              <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" class="btn btn-success rounded-pill px-4 fw-bold">บันทึกข้อมูล</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="mainVenModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+          <div class="modal-header bg-primary text-white border-0 rounded-top-4">
+            <h5 class="modal-title fw-bold"><i class="bi bi-card-heading me-2"></i>{{ isEditingMain ? 'แก้ไขชื่อเวร' : 'เพิ่มชื่อเวร' }}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <form @submit.prevent="submitMainVen">
+            <div class="modal-body p-4">
+              <div class="row g-3 mb-3">
+                <div class="col-md-2">
+                  <label class="form-label fw-semibold text-muted small">ลำดับ</label>
+                  <input type="number" class="form-control" v-model="mainForm.srt" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-semibold text-muted small">ชื่อเวร (แบบย่อ)</label>
+                  <input type="text" class="form-control" v-model="mainForm.name" required>
+                </div>
+                
+                <div class="col-md-4 mb-3">
+                  <label class="form-label small fw-bold">ช่วงเวลาเวร</label>
+                  <select class="form-select" v-model="mainForm.dn" required>
+                    <option value="" disabled>-- เลือกช่วงเวลา --</option>
+                    <option v-for="t in timeOptions" :key="t.id" :value="timeLabel(t)">
+                      {{ t.name_th }}({{ t.time_period }})
+                    </option>
+                  </select>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-semibold text-muted small">ชื่อเวรเต็ม (แสดงในคำสั่ง)</label>
+                <textarea class="form-control" v-model="mainForm.name_full" rows="4" required placeholder="ให้ข้าราชการตุลาการ..."></textarea>
+              </div>
+            </div>
+            <div class="modal-footer border-0 pb-4 pe-4 d-flex justify-content-end">
+              <button type="button" class="btn btn-light rounded-pill px-4 me-2" data-bs-dismiss="modal">ยกเลิก</button>
+              <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold">บันทึก</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="manageVenUsersModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+          <div class="modal-header bg-info text-white border-0 rounded-top-4">
+            <h5 class="modal-title fw-bold"><i class="bi bi-people-fill me-2"></i>ผู้มีสิทธิ์อยู่เวร: {{ activeManageSub?.name }}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body p-4 row g-4">
+             <div class="col-md-6 border-end">
+                <h6 class="fw-bold mb-3 text-success">รายชื่อที่มีสิทธิ์ปัจจุบัน</h6>
+                <ul class="list-group list-group-flush border rounded-3 overflow-hidden">
+                   <li v-for="(u, index) in assignedUsers" :key="u.vu_id" class="list-group-item d-flex justify-content-between align-items-center bg-light">
+                      <span>
+                        <span class="badge bg-secondary me-2">{{ index + 1 }}</span>
+                        <i class="bi bi-person-check-fill text-success me-2"></i>{{ u.full_name || (u.prefix_name + u.first_name + ' ' + u.last_name) }}
+                      </span>
+                      
+                      <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary border-0" @click="moveUserUp(index)" :disabled="index === 0" title="เลื่อนขึ้น">
+                          <i class="bi bi-arrow-up"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary border-0" @click="moveUserDown(index)" :disabled="index === assignedUsers.length - 1" title="เลื่อนลง">
+                          <i class="bi bi-arrow-down"></i>
+                        </button>
+                        <button class="btn btn-outline-danger border-0 ms-1" @click="removeUserFromSub(u.vu_id)" title="ลบออก">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </div>
+                   </li>
+                   <li v-if="assignedUsers.length === 0" class="list-group-item text-muted text-center py-4">ยังไม่ได้กำหนดรายชื่อ</li>
+                </ul>
+             </div>
+             <div class="col-md-6">
+                <h6 class="fw-bold mb-3 text-primary">เพิ่มรายชื่อใหม่</h6>
+                <div class="input-group mb-3 shadow-sm rounded-pill overflow-hidden border">
+                   <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
+                   <input type="text" class="form-control border-0 shadow-none" v-model="userSearchQuery" placeholder="ค้นหาชื่อพนักงาน...">
+                </div>
+                <div class="list-group list-group-flush border rounded-3 overflow-auto custom-scrollbar" style="max-height: 250px;">
+                   <button v-for="user in filteredAllUsers" :key="user.id" 
+                           class="list-group-item list-group-item-action py-2 d-flex justify-content-between align-items-center" 
+                           @click="addUserToSub(user.id)">
+                      <span>{{ user.full_name || (user.prefix_name + user.first_name + ' ' + user.last_name) }}</span>
+                      <i class="bi bi-plus-circle text-primary fs-5"></i>
+                   </button>
+                   <div v-if="filteredAllUsers.length === 0" class="text-center text-muted p-3">ไม่พบรายชื่อ หรือพนักงานทุกคนถูกเพิ่มแล้ว</div>
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from 'vue'
+import api from '../services/api'
+import Swal from '../services/alerts'
+import { Modal } from 'bootstrap'
+
+// ==========================================
+// 🌟 1. ส่วนจัดการข้อมูลหลัก (Ven Full Data)
+// ==========================================
+const timeOptions = ref([])
+const venData = ref([])
+const isEditingTime = ref(false)
+const isSavingTime = ref(false)
+const selectedTimeUsedCount = ref(0)
+const timeForm = ref({ id: null, name_th: '', time_period: '', srt: 1 })
+let timeModalInstance = null
+
+const timeLabel = time => `${time.name_th}(${time.time_period})`
+
+const fetchTimeOptions = async () => {
+  try {
+    const response = await api.get('?route=admin/ven_time')
+    timeOptions.value = Array.isArray(response.data) ? response.data : []
+  } catch (error) {
+    Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดช่วงเวลาเวรได้', 'error')
+  }
+}
+
+const openTimeModal = (time = null) => {
+  isEditingTime.value = Boolean(time)
+  selectedTimeUsedCount.value = Number(time?.used_count || 0)
+  timeForm.value = time
+    ? { id: Number(time.id), name_th: time.name_th, time_period: time.time_period, srt: Number(time.srt) }
+    : { id: null, name_th: '', time_period: '', srt: Math.max(0, ...timeOptions.value.map(item => Number(item.srt) || 0)) + 1 }
+  timeModalInstance.show()
+}
+
+const saveTime = async () => {
+  isSavingTime.value = true
+  try {
+    await api.post('?route=admin/ven_time', timeForm.value)
+    timeModalInstance.hide()
+    await fetchTimeOptions()
+    Swal.fire('สำเร็จ', 'บันทึกช่วงเวลาเวรแล้ว', 'success')
+  } catch (error) {
+    Swal.fire('ข้อผิดพลาด', error.response?.data?.error || 'ไม่สามารถบันทึกช่วงเวลาเวรได้', 'error')
+  } finally {
+    isSavingTime.value = false
+  }
+}
+
+const deleteTime = async time => {
+  if (Number(time.used_count) > 0) return
+  const confirmation = await Swal.fire({
+    title: 'ลบช่วงเวลาเวร?',
+    text: `${time.name_th} (${time.time_period})`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'ลบ',
+    cancelButtonText: 'ยกเลิก'
+  })
+  if (!confirmation.isConfirmed) return
+  try {
+    await api.delete(`?route=admin/ven_time&id=${encodeURIComponent(time.id)}`)
+    await fetchTimeOptions()
+    Swal.fire('สำเร็จ', 'ลบช่วงเวลาเวรแล้ว', 'success')
+  } catch (error) {
+    Swal.fire('ข้อผิดพลาด', error.response?.data?.error || 'ไม่สามารถลบช่วงเวลาเวรได้', 'error')
+  }
+}
+
+const fetchVenFullData = async () => {
+  try {
+    const response = await api.get('?route=admin/ven/setting&action=ven_full')
+    
+    // 🌟 เช็คว่า API ทำงานสำเร็จ (success: true) และมีข้อมูล (data) อยู่จริง
+    if (response.data && response.data.success && Array.isArray(response.data.data)) {
+      
+      // 🌟 เข้าถึง Array จริงๆ ผ่าน response.data.data
+      venData.value = response.data.data.map(ven => {
+        // จัดเรียง subs ตามลำดับ srt
+        if (ven.subs && Array.isArray(ven.subs)) {
+            ven.subs.sort((a, b) => a.srt - b.srt)
+        }
+        return ven
+      })
+
+    } else {
+      console.warn("ข้อมูลเวรว่างเปล่า หรือรูปแบบ API ไม่ถูกต้อง", response.data)
+      venData.value = []
+    }
+    
+  } catch (error) {
+    console.error("Fetch Ven Error:", error)
+    Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลเวรได้', 'error')
+  }
+}
+
+const deleteVenName = async (id) => {
+  const result = await Swal.fire({ 
+    title: 'ยืนยันการลบกลุ่มเวร?', 
+    text: 'คำเตือน: หากลบกลุ่มเวรนี้ หน้าที่ย่อยทั้งหมดที่อยู่ในกลุ่มจะถูกลบไปด้วย คุณแน่ใจหรือไม่?',
+    icon: 'warning', 
+    showCancelButton: true, 
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'ใช่, ลบเลย!',
+    cancelButtonText: 'ยกเลิก'
+  })
+
+  if (result.isConfirmed) {
+    try {
+      await api.post(`?route=admin/ven/setting&action=delete_ven_name`, { id })
+      fetchVenFullData()
+      Swal.fire('ลบสำเร็จ!', 'ข้อมูลกลุ่มเวรถูกลบเรียบร้อยแล้ว', 'success')
+    } catch (error) {
+      Swal.fire('ผิดพลาด', 'ไม่สามารถลบข้อมูลได้', 'error')
+    }
+  }
+}
+
+const deleteSubDuty = async (id) => {
+  const result = await Swal.fire({ 
+    title: 'ยืนยันการลบหน้าที่ย่อย?', 
+    text: 'คุณแน่ใจหรือไม่ที่จะลบหน้าที่ย่อยนี้?',
+    icon: 'warning', 
+    showCancelButton: true, 
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#6c757d',
+    confirmButtonText: 'ใช่, ลบเลย!',
+    cancelButtonText: 'ยกเลิก'
+  })
+
+  if (result.isConfirmed) {
+    try {
+      await api.post(`?route=admin/ven/setting&action=delete_sub_duty`, { id })
+      fetchVenFullData()
+      Swal.fire('ลบสำเร็จ!', 'ข้อมูลหน้าที่ย่อยถูกลบเรียบร้อยแล้ว', 'success')
+    } catch (error) {
+      Swal.fire('ผิดพลาด', 'ไม่สามารถลบข้อมูลได้', 'error')
+    }
+  }
+}
+
+// 🌟 ปรับปรุงฟังก์ชันคำนวณสีตัวอักษรให้ฉลาดขึ้น (รองรับโค้ดสี HEX)
+const getTextColor = (bgColor) => {
+  if (!bgColor) return '#000'
+  
+  // เช็คสีชื่อปกติ (Known CSS colors)
+  const darkColors = ['blueviolet', 'brown', 'green', 'magenta', 'darkblue', 'teal', 'crimson', 'darkorange']
+  if (darkColors.includes(bgColor.toLowerCase())) return '#fff'
+  
+  // เช็คสีรหัส HEX
+  if (bgColor.startsWith('#')) {
+    let color = bgColor.substring(1)
+    if (color.length === 3) color = color.split('').map(c => c + c).join('')
+    if (color.length === 6) {
+      const r = parseInt(color.substring(0, 2), 16)
+      const g = parseInt(color.substring(2, 4), 16)
+      const b = parseInt(color.substring(4, 6), 16)
+      const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000
+      return (yiq >= 128) ? '#000' : '#fff'
+    }
+  }
+  return '#fff' // ค่า Default
+}
+
+// ==========================================
+// 🌟 2. ส่วนจัดการชื่อเวรหลัก (Main Ven)
+// ==========================================
+let mainModalInstance = null
+const isEditingMain = ref(false)
+const mainForm = ref({ id: '', srt: 1, name: '', dn: '', name_full: '' })
+
+const addMainVen = () => {
+  isEditingMain.value = false
+  mainForm.value = { id: '', srt: venData.value.length + 1, name: '', dn: timeOptions.value[0] ? timeLabel(timeOptions.value[0]) : '', name_full: '' }
+  mainModalInstance.show()
+}
+
+const editMainVen = async (ven) => {
+  Swal.fire({ title: 'กำลังดึงข้อมูล...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+  try {
+    const response = await api.get(`?route=admin/ven/setting&table=ven_name&action=get_by_id&id=${ven.id}`);
+    const data = response.data;
+    if (data) {
+      isEditingMain.value = true;
+      mainForm.value = { 
+        id: data.id, 
+        srt: data.srt || 0, 
+        name: data.name, 
+        dn: data.dn || (timeOptions.value[0] ? timeLabel(timeOptions.value[0]) : ''),
+        name_full: data.name_full || '' 
+      };
+      Swal.close();
+      mainModalInstance.show();
+    } else {
+      Swal.fire('ข้อผิดพลาด', 'ไม่พบข้อมูลที่ต้องการ', 'error');
+    }
+  } catch (error) {
+    Swal.fire('ข้อผิดพลาด', 'ไม่สามารถดึงข้อมูลจากเซิร์ฟเวอร์ได้', 'error');
+  }
+}
+
+const submitMainVen = async () => {
+  try {
+    const action = isEditingMain.value ? 'update_venname' : 'create_venname' 
+    await api.post(`?route=admin/ven/setting&table=ven_name&action=${action}`, mainForm.value)
+    mainModalInstance.hide() // 🌟 ใช้ API ของ Bootstrap Modal แทนการจำลองคลิก
+    Swal.fire('สำเร็จ', 'บันทึกชื่อเวรหลักเรียบร้อย', 'success')
+    fetchVenFullData()
+  } catch (error) {
+    Swal.fire('ข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้', 'error')
+  }
+}
+
+// ==========================================
+// 🌟 3. ส่วนจัดการหน้าที่ย่อย (Sub Ven)
+// ==========================================
+let subModalInstance = null
+const isEditingSub = ref(false)
+const subForm = ref({ id: '', ven_name_id: '', name: '', price: 0, color: 'BlueViolet', srt: 1 })
+const presetColors = ref(['BlueViolet', 'Brown', 'Green', 'Magenta', 'Teal', 'DarkBlue', 'Crimson', 'DarkOrange', '#0d6efd', '#198754', '#dc3545', '#ffc107'])
+
+const selectColor = (colorCode) => { subForm.value.color = colorCode }
+
+const openSubModal = (mode, venNameId, sub = null) => {
+  if (mode === 'add') {
+    isEditingSub.value = false
+    const parentVen = venData.value.find(v => v.id === venNameId)
+    const nextSrt = parentVen && parentVen.subs ? parentVen.subs.length + 1 : 1
+    subForm.value = { id: '', ven_name_id: venNameId, name: '', price: 0, color: 'BlueViolet', srt: nextSrt }
+  } else {
+    isEditingSub.value = true
+    subForm.value = { ...sub, ven_name_id: venNameId }
+  }
+  subModalInstance.show()
+}
+
+const submitSubVen = async () => {
+  try {
+    const action = isEditingSub.value ? 'update_sub' : 'create_sub'
+    await api.post(`?route=admin/ven/setting&table=ven_name_sub&action=${action}`, subForm.value)
+    subModalInstance.hide() // 🌟 ใช้คำสั่ง Hide ของ Bootstrap 
+    Swal.fire('สำเร็จ', 'บันทึกข้อมูลหน้าที่ย่อยเรียบร้อย', 'success')
+    fetchVenFullData()
+  } catch (error) {
+    Swal.fire('ข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้', 'error')
+  }
+}
+
+// ==========================================
+// 🌟 3.1 Drag & Drop จัดเรียงหน้าที่ย่อย
+// ==========================================
+const draggedIndex = ref(null)
+const draggedVenId = ref(null)
+
+const onDragStartSub = (index, venId) => {
+  draggedIndex.value = index
+  draggedVenId.value = venId
+}
+
+const onDropSub = async (dropIndex, venId) => {
+  if (draggedVenId.value !== venId) return 
+  if (draggedIndex.value === dropIndex) return 
+
+  const ven = venData.value.find(v => v.id === venId)
+  
+  const draggedItem = ven.subs.splice(draggedIndex.value, 1)[0]
+  ven.subs.splice(dropIndex, 0, draggedItem)
+
+  ven.subs.forEach((sub, i) => { sub.srt = i + 1 })
+
+  const payload = ven.subs.map(sub => ({ id: sub.id, srt: sub.srt }))
+
+  try {
+    await api.post('?route=admin/ven/setting&table=ven_name_sub&action=update_order', payload)
+    draggedIndex.value = null
+    draggedVenId.value = null
+  } catch (error) {
+    Swal.fire('ผิดพลาด', 'ไม่สามารถบันทึกการจัดเรียงได้', 'error')
+    fetchVenFullData()
+  }
+}
+
+// ==========================================
+// 🌟 4. ส่วนจัดการผู้อยู่เวร (Ven Users)
+// ==========================================
+const activeManageSub = ref(null)
+const assignedUsers = ref([])
+const allUsers = ref([])
+const userSearchQuery = ref('')
+let manageUsersModalInstance = null
+
+const fetchAllUsers = async () => {
+  const res = await api.get('?route=admin/ven_user/allUsers') 
+  allUsers.value = res.data
+}
+
+const fetchAssignedUsers = async (subId) => {
+  const res = await api.get(`?route=admin/ven_user/get_by_sub&sub_id=${subId}`)
+  assignedUsers.value = res.data || []
+}
+
+// 🌟 ปรับปรุงระบบค้นหาให้ดักจับชื่อแบบเต็มและแบบประกอบ
+const filteredAllUsers = computed(() => {
+  const assignedIds = assignedUsers.value.map(u => u.user_id)
+  let available = allUsers.value.filter(u => !assignedIds.includes(u.id))
+  
+  if (userSearchQuery.value) {
+    const q = userSearchQuery.value.toLowerCase()
+    available = available.filter(u => {
+      const name = u.full_name || (`${u.prefix_name || ''}${u.first_name || ''} ${u.last_name || ''}`)
+      return name.toLowerCase().includes(q)
+    })
+  }
+  return available
+})
+
+const openManageUsersModal = async (sub) => {
+  activeManageSub.value = sub
+  userSearchQuery.value = ''
+  await fetchAssignedUsers(sub.id)
+  manageUsersModalInstance.show()
+}
+
+const addUserToSub = async (userId) => {
+  await api.post('?route=admin/ven_user/add', { sub_id: activeManageSub.value.id, user_id: userId })
+  await fetchAssignedUsers(activeManageSub.value.id) 
+}
+
+const removeUserFromSub = async (vuId) => {
+  await api.post('?route=admin/ven_user/remove', { vu_id: vuId })
+  await fetchAssignedUsers(activeManageSub.value.id) 
+}
+
+const saveUserOrder = async () => {
+  const orderedIds = assignedUsers.value.map(u => u.vu_id)
+  await api.post('?route=admin/ven_user/update_order', { ordered_ids: orderedIds })
+}
+
+const moveUserUp = async (index) => {
+  if (index > 0) {
+    const temp = assignedUsers.value[index];
+    assignedUsers.value[index] = assignedUsers.value[index - 1];
+    assignedUsers.value[index - 1] = temp;
+    await saveUserOrder(); 
+  }
+}
+
+const moveUserDown = async (index) => {
+  if (index < assignedUsers.value.length - 1) {
+    const temp = assignedUsers.value[index];
+    assignedUsers.value[index] = assignedUsers.value[index + 1];
+    assignedUsers.value[index + 1] = temp;
+    await saveUserOrder();
+  }
+}
+
+// ==========================================
+// 🌟 Initialize เมื่อหน้าเว็บโหลดเสร็จ
+// ==========================================
+onMounted(() => {
+  fetchVenFullData()
+  fetchAllUsers() 
+  fetchTimeOptions()
+  subModalInstance = new Modal(document.getElementById('subVenModal'))
+  timeModalInstance = new Modal(document.getElementById('venTimeModal'))
+  mainModalInstance = new Modal(document.getElementById('mainVenModal'))
+  manageUsersModalInstance = new Modal(document.getElementById('manageVenUsersModal'))
+})
+</script>
+
+<style scoped>
+.list-group-item { 
+  border-right: 0; 
+  border-left: 0; 
+  border-top: 1px solid rgba(255, 255, 255, 0.2); 
+}
+.list-group-item:first-child { 
+  border-top: 0; 
+}
+.hover-opacity-100:hover { 
+  opacity: 1 !important; 
+  transform: scale(1.1); 
+  transition: 0.2s; 
+}
+
+/* 🌟 สไตล์สำหรับการลากวาง (Drag & Drop) */
+.sub-item {
+  transition: transform 0.1s;
+}
+.sub-item:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+.drag-handle {
+  cursor: grab;
+  opacity: 0.6;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.drag-handle:hover {
+  opacity: 1;
+}
+
+/* Scrollbar เบาๆ สำหรับลิสต์ */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #0d6efd; }
+</style>

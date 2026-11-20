@@ -1,0 +1,66 @@
+name: Security and build
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: fixture-only-ci-password
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pfixture-only-ci-password"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix backend-node
+      - run: npm audit --prefix backend-node --omit=dev --audit-level=moderate
+      - run: npm test --prefix backend-node
+      - name: Integration with MySQL 8 over actual loopback
+        # The native installer creates a localhost-only DB account. Share MySQL's
+        # network namespace so the test uses loopback rather than Docker's bridge IP.
+        run: >-
+          docker run --rm
+          --network "container:${{ job.services.mysql.id }}"
+          --user "$(id -u):$(id -g)"
+          -e TEST_DB_HOST=127.0.0.1 -e TEST_DB_PORT=3306
+          -e TEST_DB_USER=root -e TEST_DB_PASS=fixture-only-ci-password
+          -v "$GITHUB_WORKSPACE:/workspace" -w /workspace/backend-node
+          node:22-bookworm-slim node --test tests/integration/system.test.js
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix backend-node
+      - run: npm test --prefix backend-node
+      - name: Build Node native installation ZIP
+        shell: powershell
+        run: .\deploy\build-native.ps1
+      - name: Verify Node ZIP contents
+        shell: powershell
+        run: .\deploy\tests\native-node.test.ps1 -Archive .\dist\vengg4-native-windows.zip
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix frontend
+      - run: npm audit --prefix frontend --audit-level=moderate
+      - run: npm test --prefix frontend
+      - run: npm run --prefix frontend build -- --base=/vengg4/
+        env:
+          VITE_API_BASE_URL: /vengg4/api/
